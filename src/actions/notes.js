@@ -11,20 +11,22 @@ export const startNewNote = () => {
     return async (dispatch, getState) => {
         const { uid } = getState().auth;
 
-        console.log(uid)
         const newNote = {
             title: '',
             body: '',
             date: new Date().getTime()
         }
 
-        const docRef = await db.collection(`${uid}/journal/notes`).add(newNote)
-        .catch(e=>{
-            console.log(e.message)
-            Swal.fire('Saved', e.message, 'success');
-        });
-        dispatch(activeNote(docRef.id, newNote));
-        dispatch(addNewNote(docRef.id, newNote));
+        try {
+            const docRef = await db.collection(`${uid}/journal/notes`).add(newNote)
+                .catch(e => {
+                    Swal.fire('Saved', e.message, 'success');
+                });
+            dispatch(activeNote(docRef.id, newNote));
+            dispatch(addNewNote(docRef.id, newNote));
+        } catch (error) {
+            console.log('startNewNote>>>>>>>>>>>>>>>>>' + error)
+        }
     }
 }
 
@@ -35,14 +37,18 @@ export const activeNote = (id, note) => ({
 
 export const addNewNote = (id, note) => ({
     type: types.notesAddNewNote,
-    payload: {id, ...note}
+    payload: { id, ...note }
 })
 
 
 export const startLoadingNotes = (id) => {
     return async (dispatch) => {
-        const notes = await loadNotes(id);
-        dispatch(setNotes(notes));
+        try {
+            const notes = await loadNotes(id);
+            dispatch(setNotes(notes));
+        } catch (error) {
+            console.log('startLoadingNotes >>>>>>' + error)
+        }
     }
 }
 
@@ -65,10 +71,10 @@ export const startSavingNote = (note) => {
         delete noteToFireStore.id;
 
         await db.doc(`/${uid}/journal/notes/${note.id}`).update(noteToFireStore)
-        .catch(e=>{
-            console.log(e.message)
-            Swal.fire('Saved', e.message, 'success');
-        });
+            .catch(e => {
+                console.log(e.message)
+                Swal.fire('Saved', e.message, 'success');
+            });
         dispatch(refreshUpdatedNote(note.id, noteToFireStore));
 
 
@@ -91,29 +97,33 @@ export const refreshUpdatedNote = (id, note) => ({
 export const startUploadingImage = (file) => {
     return async (dispatch, getState) => {
 
-        const activeNote = getState().notes.active;
+        try {
+            const activeNote = getState().notes.active;
 
-        Swal.fire({
-            title: 'Loading...',
-            text: 'Please wait...',
-            allowOutsideClick: false,
-            showConfirmButton: false,
-            didOpen: () => { Swal.showLoading() }
-        })
-        const imageFileUrl = await uploadImage(file);
+            Swal.fire({
+                title: 'Loading...',
+                text: 'Please wait...',
+                allowOutsideClick: false,
+                showConfirmButton: false,
+                didOpen: () => { Swal.showLoading() }
+            })
+            
+            const imageFileUrl = await uploadImage(file);
+            activeNote.imageUrl = imageFileUrl;
 
-        activeNote.imageUrl = imageFileUrl;
+            dispatch(startSavingNote(activeNote));
 
-        dispatch(startSavingNote(activeNote));
-
-        Swal.close();
+            Swal.close();
+        } catch (error) {
+            console.log('startUploadingImage >>>>>>>>>>>>' + error)
+        }
 
     }
 }
 
 export const startDeleteNote = (id) => {
-    return async(dispath, getState)=>{
-        
+    return async (dispath, getState) => {
+
         const uid = getState().auth.uid;
 
         Swal.fire({
@@ -124,17 +134,17 @@ export const startDeleteNote = (id) => {
             didOpen: () => { Swal.showLoading() }
         })
         await db.doc(`${uid}/journal/notes/${id}`).delete();
-        
+
         dispath(deleteNote(id));
-        
+
         Swal.close()
-      
+
     }
 }
 
 export const deleteNote = (id) => ({
     type: types.notesDeleteNote,
-    payload: {id}
+    payload: { id }
 })
 
 export const notesLogout = () => ({
